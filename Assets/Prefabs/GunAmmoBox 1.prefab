@@ -46,6 +46,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraReferencia: {fileID: 0}
+  nombreEscenaMultiplayer: MultiPlayer
 --- !u!1 &5325619740200298980
 GameObject:
   m_ObjectHideFlags: 0
@@ -302,7 +303,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99f6ded0a7d3b26479fe83d2948890a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ammo: 30
+  ammo: 5
+  granada: 1
 --- !u!23 &2399560862188882967
 MeshRenderer:
   m_ObjectHideFlags: 0

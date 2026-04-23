@@ -136,7 +136,7 @@ public class PlayerInteractions : MonoBehaviour
     }
     void SelectedObject(Transform transform)
     {
-        transform.GetComponent<MeshRenderer>().material.color = Color.cyan;
+        //transform.GetComponent<MeshRenderer>().material.color = Color.cyan;
         ultimoReconocido = transform.gameObject;
         
         // Buscar el Plane en la jerarquía (hijo del hijo)

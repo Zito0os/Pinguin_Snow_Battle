@@ -7,6 +7,8 @@ using UnityEngine.SceneManagement;
 
 public class PlayerMovement : MonoBehaviourPunCallbacks
 {
+    public static bool bloqueoMovimientoExterno = false;
+
     [Header("Multijugador")]
     public string nombreEscenaMultiplayer = "MultiPlayer";
     private bool usarPhotonEnEscena = false;
@@ -87,6 +89,13 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
     {
         if (EsControlLocal())
         {
+            if (bloqueoMovimientoExterno)
+            {
+                velocity.y += gravity * Time.deltaTime;
+                characterController.Move(velocity * Time.deltaTime);
+                return;
+            }
+
             // Si el juego está pausado (Time.timeScale == 0), no procesar input de movimiento
             // Esto permite que el EventSystem procese eventos UI en Android
             if (Time.timeScale == 0)
@@ -166,6 +175,11 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     }
 
+    public static void SetBloqueoMovimientoExterno(bool bloquear)
+    {
+        bloqueoMovimientoExterno = bloquear;
+    }
+
     private bool TryGetEspMovementInput(out float joyXInput, out float joyYInput)
     {
         joyXInput = 0f;
@@ -231,7 +245,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             animator.SetBool("isJumping", true);
         }
 
-        if (!isGrounded)
+        if (isGrounded && velocity.y <= 0f)
         {
             animator.SetBool("isJumping", false);
         }

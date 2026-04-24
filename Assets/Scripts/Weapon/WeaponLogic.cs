@@ -45,6 +45,12 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     public AudioClip cambiarModoDisparoSound;
     public AudioClip curarSound;
 
+    [Header("Animacion de disparo (personaje)")]
+    public Animator animatorDisparo;
+    public string parametroDisparo = "disparo";
+    public float delayDisparo = 0.12f;
+    public float duracionPulsoBoolDisparo = 0.05f;
+
     public bool continueShooting = false;
     public float tiempoRecarga = 3f;
     public float tiempoCuracion = 3f;
@@ -91,6 +97,9 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     private PhotonView ownerPhotonView;
     private Coroutine vibracionContinuaCoroutine;
     private bool vibracionContinuaActiva = false;
+    private Coroutine resetBoolDisparoCoroutine;
+    private Coroutine disparoConDelayCoroutine;
+    private bool disparoPendienteSalida = false;
 
 
 
@@ -120,6 +129,8 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         {
             camaraApuntado = Camera.main;
         }
+
+        ResolverAnimatorDisparo();
 
         if (!usarPhotonEnEscena || EsControlLocal())
         {
@@ -432,18 +443,19 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
             return;
         }
 
-        if (audioSource != null && shotSound != null)
+        if (disparoPendienteSalida)
         {
-            audioSource.PlayOneShot(shotSound);
+            return;
         }
+
+        disparoPendienteSalida = true;
 
         cargador_actual--;
         EjecutarVibracionPorDisparo();
         SincronizarHaciaGameManager();
 
-        Vector3 direccionDisparo = ObtenerDireccionDisparo();
-        Debug.Log($"[WeaponLogic] Enviando RPC ShootMultiplayer - Posición: {spawnPoint.position}, Dirección: {direccionDisparo}, ViewID: {ownerPhotonView.ViewID}");
-        ownerPhotonView.RPC("ShootMultiplayer", RpcTarget.AllViaServer, spawnPoint.position, direccionDisparo);
+        ActivarAnimacionDisparo();
+        disparoConDelayCoroutine = StartCoroutine(DispararConDelay(true));
         shootRateTime = Time.time + shotRate;
     }
 
@@ -505,56 +517,147 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         //checar si tenemos la municion
         if (cargador_actual > 0)
         {
-
-            if (audioSource != null)
+            if (disparoPendienteSalida)
             {
-                audioSource.PlayOneShot(shotSound);
+                return;
             }
+
+            disparoPendienteSalida = true;
 
             cargador_actual--;
             EjecutarVibracionPorDisparo();
             SincronizarHaciaGameManager();
 
-
-
-            GameObject newBullet;
-            Vector3 direccionDisparo = ObtenerDireccionDisparo();
-            Quaternion rotacionDisparo = Quaternion.LookRotation(direccionDisparo, Vector3.up);
-
-            //instanciamos una bala 
-            newBullet = Instantiate(bullet, spawnPoint.position, rotacionDisparo);
-
-            // Asignar el shooter para detección de daño entre jugadores
-            Bullet bulletScript = newBullet.GetComponent<Bullet>();
-            if (bulletScript != null && ownerPhotonView != null)
-            {
-                Debug.Log($"[WeaponLogic] Shoot - Asignando shooter ViewID: {ownerPhotonView.ViewID}");
-                bulletScript.SetShooter(ownerPhotonView);
-            }
-            else
-            {
-                Debug.LogWarning($"[WeaponLogic] Shoot - BulletScript: {bulletScript != null}, OwnerPhotonView: {ownerPhotonView != null}");
-            }
-
-            Rigidbody balaRigidbody = newBullet.GetComponent<Rigidbody>();
-            if (balaRigidbody != null)
-            {
-                balaRigidbody.AddForce(direccionDisparo * shotforce);
-            }
+            ActivarAnimacionDisparo();
+            disparoConDelayCoroutine = StartCoroutine(DispararConDelay(false));
 
             shootRateTime = Time.time + shotRate;
-
-
-
-            //la bala se destruye despues de 1 segundos
-            Destroy(newBullet, 1);
-
         }
         else
         {
             CancelInvoke("Shoot");
             DetenerVibracionContinua();
         }
+    }
+
+    private IEnumerator DispararConDelay(bool enviarPorRPC)
+    {
+        if (delayDisparo > 0f)
+        {
+            yield return new WaitForSeconds(delayDisparo);
+        }
+
+        if (audioSource != null && shotSound != null)
+        {
+            audioSource.PlayOneShot(shotSound);
+        }
+
+        Vector3 direccionDisparo = ObtenerDireccionDisparo();
+
+        if (enviarPorRPC && usarPhotonEnEscena && ownerPhotonView != null)
+        {
+            Debug.Log($"[WeaponLogic] Enviando RPC ShootMultiplayer - Posición: {spawnPoint.position}, Dirección: {direccionDisparo}, ViewID: {ownerPhotonView.ViewID}");
+            ownerPhotonView.RPC("ShootMultiplayer", RpcTarget.AllViaServer, spawnPoint.position, direccionDisparo);
+        }
+
+        if (!enviarPorRPC || !usarPhotonEnEscena || ownerPhotonView == null)
+        {
+            InstanciarBalaLocal(spawnPoint.position, direccionDisparo);
+        }
+
+        disparoPendienteSalida = false;
+        disparoConDelayCoroutine = null;
+    }
+
+    private void InstanciarBalaLocal(Vector3 position, Vector3 direccionDisparo)
+    {
+        Quaternion rotacionDisparo = Quaternion.LookRotation(direccionDisparo, Vector3.up);
+        GameObject newBullet = Instantiate(bullet, position, rotacionDisparo);
+
+        Bullet bulletScript = newBullet.GetComponent<Bullet>();
+        if (bulletScript != null && ownerPhotonView != null)
+        {
+            Debug.Log($"[WeaponLogic] Shoot - Asignando shooter ViewID: {ownerPhotonView.ViewID}");
+            bulletScript.SetShooter(ownerPhotonView);
+        }
+        else
+        {
+            Debug.LogWarning($"[WeaponLogic] Shoot - BulletScript: {bulletScript != null}, OwnerPhotonView: {ownerPhotonView != null}");
+        }
+
+        Rigidbody balaRigidbody = newBullet.GetComponent<Rigidbody>();
+        if (balaRigidbody != null)
+        {
+            balaRigidbody.AddForce(direccionDisparo * shotforce);
+        }
+
+        Destroy(newBullet, 1);
+    }
+
+    private void ActivarAnimacionDisparo()
+    {
+        if (animatorDisparo == null || string.IsNullOrEmpty(parametroDisparo))
+            return;
+
+        AnimatorControllerParameter parametroEncontrado = null;
+        foreach (AnimatorControllerParameter parametro in animatorDisparo.parameters)
+        {
+            if (parametro.name == parametroDisparo)
+            {
+                parametroEncontrado = parametro;
+                break;
+            }
+        }
+
+        if (parametroEncontrado == null)
+            return;
+
+        if (parametroEncontrado.type == AnimatorControllerParameterType.Trigger)
+        {
+            animatorDisparo.SetTrigger(parametroDisparo);
+            return;
+        }
+
+        if (parametroEncontrado.type == AnimatorControllerParameterType.Bool)
+        {
+            animatorDisparo.SetBool(parametroDisparo, true);
+
+            if (resetBoolDisparoCoroutine != null)
+            {
+                StopCoroutine(resetBoolDisparoCoroutine);
+            }
+
+            resetBoolDisparoCoroutine = StartCoroutine(ResetBoolDisparo());
+        }
+    }
+
+    private void ResolverAnimatorDisparo()
+    {
+        if (animatorDisparo != null)
+            return;
+
+        // Prioridad: Animator del personaje (PlayerMovement)
+        PlayerMovement playerMovement = GetComponentInParent<PlayerMovement>();
+        if (playerMovement != null && playerMovement.animator != null)
+        {
+            animatorDisparo = playerMovement.animator;
+            return;
+        }
+
+        // Fallback por compatibilidad
+        animatorDisparo = GetComponentInParent<Animator>();
+    }
+
+    private IEnumerator ResetBoolDisparo()
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.01f, duracionPulsoBoolDisparo));
+
+        if (animatorDisparo != null && !string.IsNullOrEmpty(parametroDisparo))
+        {
+            animatorDisparo.SetBool(parametroDisparo, false);
+        }
+
+        resetBoolDisparoCoroutine = null;
     }
 
     private void EjecutarVibracionPorDisparo()
@@ -799,5 +902,19 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         CancelInvoke("Shoot");
         CancelInvoke("ShootRPC");
         DetenerVibracionContinua();
+
+        if (disparoConDelayCoroutine != null)
+        {
+            StopCoroutine(disparoConDelayCoroutine);
+            disparoConDelayCoroutine = null;
+        }
+
+        disparoPendienteSalida = false;
+
+        if (resetBoolDisparoCoroutine != null)
+        {
+            StopCoroutine(resetBoolDisparoCoroutine);
+            resetBoolDisparoCoroutine = null;
+        }
     }
 }

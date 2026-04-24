@@ -61,10 +61,11 @@ public class PlayerInteractions : MonoBehaviour
 
             bool takeInput = Input.GetKeyDown(KeyCode.E) || TryGetEspTakeInputDown();
 
-
-            //tarea de color
-            SelectedObject(hit.transform);
-            //tarea de color
+            bool esObjetoResaltable = hit.collider.CompareTag("GunAmmo") || hit.collider.CompareTag("HealthObject");
+            if (esObjetoResaltable)
+            {
+                SelectedObject(hit.transform);
+            }
 
 
             if (hit.collider.tag == "GunAmmo")
@@ -97,6 +98,29 @@ public class PlayerInteractions : MonoBehaviour
                 if (takeInput)
                 {
                     GameManager.Instance.agregar_vendas(hit.collider.gameObject.GetComponent<HealthObject>().health);
+                }
+            }
+
+            if (hit.collider.CompareTag("Puerta"))
+            {
+                //Debug.Log("[PlayerInteractions] Raycast detectó puerta");
+                Abrir_puerta puerta = hit.collider.GetComponentInParent<Abrir_puerta>();
+                if (puerta != null)
+                {
+                    //Debug.Log("[PlayerInteractions] Componente Abrir_puerta encontrado");
+                    if (takeInput)
+                    {
+                        //Debug.Log("[PlayerInteractions] E presionado - llamando Interactuar()");
+                        puerta.Interactuar();
+                    }
+                    else
+                    {
+                        //Debug.Log("[PlayerInteractions] E NO presionado");
+                    }
+                }
+                else
+                {
+                    //Debug.LogWarning("[PlayerInteractions] Puerta detectada pero Abrir_puerta no encontrado");
                 }
             }
 

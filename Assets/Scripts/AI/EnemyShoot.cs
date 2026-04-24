@@ -12,6 +12,8 @@ public class EnemyShoot : MonoBehaviour
     private Transform playerPosition;
     public float bulletVelocity = 100f;
     public float shootInterval = 3f;
+    [Header("Delay de ataque")]
+    public float delayAntesPrimerDisparo = 2f;
     public float alturaObjetivoJugador = 1.2f;
 
     private bool canShoot = false;
@@ -79,7 +81,7 @@ public class EnemyShoot : MonoBehaviour
         canShoot = shooting;
         if (canShoot)
         {
-            nextShootTime = Time.time;
+            nextShootTime = Time.time + Mathf.Max(0f, delayAntesPrimerDisparo);
         }
     }
 

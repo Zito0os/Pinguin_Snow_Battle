@@ -12,6 +12,9 @@ TagManager:
   - HealthObject
   - cambiar_color
   - Bullet
+  - Monedas
+  - balas
+  - Puerta
   layers:
   - Default
   - TransparentFX

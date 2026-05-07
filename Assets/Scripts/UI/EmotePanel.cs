@@ -13,9 +13,11 @@ public class EmotePanel : MonoBehaviour
     public static bool isEmotePanelActive = false;
 
 
-
+    public Animator animator; // Asignar el Animator del jugador en el Inspector
     [Header("Highlights (8)")]
     public GameObject[] highlights; // 8 objetos
+
+    private bool play_emote;
 
 
 
@@ -115,8 +117,14 @@ public class EmotePanel : MonoBehaviour
 
     void ReproducirEmote()
     {
+
         if (emoteActual == -1) return;
 
-        //playerAnimator.SetInteger("EmoteIndex", emoteActual);
+        
+        
+        //animator.SetInteger("EmoteIndex", emoteActual);
+        animator.SetFloat("EmoteIndex 0", emoteActual);
+        animator.SetTrigger("Play_Emote");
+
     }
 }

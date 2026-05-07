@@ -484,7 +484,6 @@ public class Menu : MonoBehaviour
         EventSystem existente = FindObjectOfType<EventSystem>();
         if (existente != null)
         {
-            existente.gameObject.tag = "EventSystem";
             StandaloneInputModule module = existente.GetComponent<StandaloneInputModule>();
             if (module != null)
             {
@@ -494,7 +493,6 @@ public class Menu : MonoBehaviour
         }
 
         GameObject eventSystemGO = new GameObject("EventSystem");
-        eventSystemGO.tag = "EventSystem";
         EventSystem es = eventSystemGO.AddComponent<EventSystem>();
         
         StandaloneInputModule inputModule = eventSystemGO.AddComponent<StandaloneInputModule>();

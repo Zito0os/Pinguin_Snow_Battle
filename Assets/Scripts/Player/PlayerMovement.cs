@@ -35,7 +35,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
     //etiqueta para el suelo, para que el player sepa si esta en el suelo o no
     public LayerMask groundMask;
 
-    bool isGrounded;
+    public bool isGrounded;
 
 
 
@@ -54,6 +54,11 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     private StaminaBar staminaSlider;
 
+    [Header("Slide")]
+    public float slideDistance = 5f;
+    public float slideSpeedMultiplier = 1.5f;
+    public float slideStaminaCost = 20f;
+    private bool isSliding = false;
 
     public Animator animator;
 
@@ -143,6 +148,11 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             animator.SetFloat("VelZ", z);
             animator.SetBool("isSprinting", isSprinting);
 
+            // Input para iniciar slide: solo si se está corriendo, en suelo y no ya deslizando
+            if (!isSliding && isSprinting && isGrounded && Input.GetKeyDown(KeyCode.LeftControl))
+            {
+                StartCoroutine(Slide());
+            }
 
             //esto es para mover al jugador adelante o hacia atras 
             Vector3 move = transform.right * x + transform.forward * z;
@@ -156,7 +166,10 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
             //esto le asigna el movimiento al caracter controler del player 
             //y le asigna la velocidad que se le dio en el inspector
-            characterController.Move(move * speed * Time.deltaTime * sprintSpeed);
+            if (!isSliding)
+            {
+                characterController.Move(move * speed * Time.deltaTime * sprintSpeed);
+            }
 
             // si alguien juega a 30 y alguien a 60 fps, el que juega a 30 fps se movera mas lento
             //por eso se multiplica por Time.deltaTime
@@ -355,6 +368,38 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         }
     }
 
+    private IEnumerator Slide()
+    {
+        // Consumir stamina de una sola vez al inicio del slide
+        if (staminaSlider != null)
+        {
+            bool puedeSlide = staminaSlider.UseStaminaInstant(slideStaminaCost);
+            if (!puedeSlide)
+            {
+                yield break; // No hay suficiente stamina, cancelar slide
+            }
+        }
 
+        isSliding = true;
+
+        float slideSpeed = speed * sprintSpeedMultiplier * slideSpeedMultiplier;
+        float duration = slideDistance / (slideSpeed > 0f ? slideSpeed : 1f);
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            // aplicar movimiento hacia adelante durante el slide y gravedad
+            Vector3 slideMove = transform.forward * slideSpeed;
+            velocity.y += gravity * Time.deltaTime;
+            characterController.Move((slideMove + new Vector3(0f, velocity.y, 0f)) * Time.deltaTime);
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        isSliding = false;
+        // El jugador mantiene su estado de sprint actual, permitiendo hacer otro slide inmediatamente
+    }
 
 }
+

@@ -22,6 +22,8 @@ public class StaminaBar : MonoBehaviour
     private Coroutine myCoroutineLosing;
     private Coroutine myCoroutineRegenerate;
 
+    // Exponer stamina actual para otras clases
+    public float CurrentStamina { get { return currentStamina; } }
 
     void Start()
     {
@@ -40,7 +42,7 @@ public class StaminaBar : MonoBehaviour
             {
                 StopCoroutine(myCoroutineLosing);
             }
-            //detener regeneración si estaba activa
+            //detener regeneraciï¿½n si estaba activa
             if (myCoroutineRegenerate != null)
             {
                 StopCoroutine(myCoroutineRegenerate);
@@ -57,6 +59,23 @@ public class StaminaBar : MonoBehaviour
         }
     }
 
+    // Consume stamina instantly (no coroutine) - para acciones puntuales como slide
+    public bool UseStaminaInstant(float amount)
+    {
+        if (currentStamina >= amount)
+        {
+            currentStamina -= amount;
+            currentStamina = Mathf.Max(currentStamina, 0);
+            staminaSlider.value = currentStamina;
+            return true;
+        }
+        else
+        {
+            Debug.Log("No hay suficiente stamina para ejecutar la accion");
+            return false;
+        }
+    }
+
     public void StopSprinting()
     {
         if (myCoroutineLosing != null)
@@ -64,7 +83,7 @@ public class StaminaBar : MonoBehaviour
             StopCoroutine(myCoroutineLosing);
             myCoroutineLosing = null;
         }
-        //Iniciar regeneración cuando se detiene el sprint
+        //Iniciar regeneraciï¿½n cuando se detiene el sprint
         if (myCoroutineRegenerate != null)
         {
             StopCoroutine(myCoroutineRegenerate);
@@ -81,7 +100,7 @@ public class StaminaBar : MonoBehaviour
         {
             //darle la stamina poco a poco
             currentStamina += regeneratesAmount;
-            currentStamina = Mathf.Min(currentStamina, maxStamina); //No superar el máximo
+            currentStamina = Mathf.Min(currentStamina, maxStamina); //No superar el mï¿½ximo
             //ponerle el valor a la barra de stamina 
             staminaSlider.value = currentStamina;
 
@@ -112,7 +131,7 @@ public class StaminaBar : MonoBehaviour
         myCoroutineLosing = null;
         //este script es el que maneja lo de correr accedemos el que tiene ese archivo para que deje de correr
         FindObjectOfType<PlayerMovement>().isSprinting = false;
-        //Iniciar regeneración automática cuando se agota la stamina
+        //Iniciar regeneraciï¿½n automï¿½tica cuando se agota la stamina
         if (myCoroutineRegenerate != null)
         {
             StopCoroutine(myCoroutineRegenerate);

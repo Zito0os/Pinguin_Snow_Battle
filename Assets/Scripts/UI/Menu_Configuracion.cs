@@ -356,7 +356,6 @@ public class Menu_Configuracion : MonoBehaviour
             return;
 
         GameObject eventSystemGO = new GameObject("EventSystem");
-        eventSystemGO.tag = "EventSystem";
         eventSystemGO.AddComponent<EventSystem>();
 
         StandaloneInputModule inputModule = eventSystemGO.AddComponent<StandaloneInputModule>();

@@ -100,6 +100,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     private Coroutine resetBoolDisparoCoroutine;
     private Coroutine disparoConDelayCoroutine;
     private bool disparoPendienteSalida = false;
+    private PlayerMovement playerMovement;
 
 
 
@@ -116,7 +117,14 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
             ownerPhotonView = GetComponentInParent<PhotonView>();
         }
         
-        Debug.Log($"[WeaponLogic] Start - OwnerPhotonView: {ownerPhotonView != null}, ViewID: {ownerPhotonView?.ViewID}, IsMine: {ownerPhotonView?.IsMine}");
+        // Obtener referencia a PlayerMovement para verificar isGrounded
+        playerMovement = GetComponentInParent<PlayerMovement>();
+        if (playerMovement == null)
+        {
+            playerMovement = FindObjectOfType<PlayerMovement>();
+        }
+        
+        Debug.Log($"[WeaponLogic] Start - OwnerPhotonView: {ownerPhotonView != null}, ViewID: {ownerPhotonView?.ViewID}, IsMine: {ownerPhotonView?.IsMine}, PlayerMovement: {playerMovement != null}");
 
         usarPhotonEnEscena = EsEscenaMultiplayerActiva();
 
@@ -542,9 +550,18 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
     private IEnumerator DispararConDelay(bool enviarPorRPC)
     {
-        if (delayDisparo > 0f)
+        // Contador de delay que se pausa si el jugador está en el aire
+        float tiempoRestante = delayDisparo;
+        
+        while (tiempoRestante > 0f)
         {
-            yield return new WaitForSeconds(delayDisparo);
+            // Solo contar si el jugador está en el suelo (grounded)
+            if (playerMovement != null && playerMovement.isGrounded)
+            {
+                tiempoRestante -= Time.deltaTime;
+            }
+            
+            yield return null;
         }
 
         if (audioSource != null && shotSound != null)

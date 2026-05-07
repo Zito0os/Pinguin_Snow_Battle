@@ -293,7 +293,6 @@ public class Menu_principal : MonoBehaviour
             return;
 
         GameObject eventSystemGO = new GameObject("EventSystem");
-        eventSystemGO.tag = "EventSystem";
         eventSystemGO.AddComponent<EventSystem>();
 
         StandaloneInputModule inputModule = eventSystemGO.AddComponent<StandaloneInputModule>();

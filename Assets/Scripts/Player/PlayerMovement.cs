@@ -58,6 +58,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
     public float slideDistance = 5f;
     public float slideSpeedMultiplier = 1.5f;
     public float slideStaminaCost = 20f;
+    public float slideEntradaDelay = 0.12f;
     private bool isSliding = false;
 
     public Animator animator;
@@ -370,11 +371,6 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     private IEnumerator Slide()
     {
-        if (animator != null)
-        {
-            animator.SetBool("barrida", true);
-        }
-
         // Consumir stamina de una sola vez al inicio del slide
         if (staminaSlider != null)
         {
@@ -390,7 +386,25 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             }
         }
 
+        if (animator != null)
+        {
+            animator.ResetTrigger("cayendo");
+            animator.ResetTrigger("levantandose");
+            animator.SetTrigger("cayendo");
+        }
+
+        // Esperar un instante para que se reproduzca la animación de "cayendo"
+        if (slideEntradaDelay > 0f)
+        {
+            yield return new WaitForSeconds(slideEntradaDelay);
+        }
+
+        // Ya empieza la fase real de barrida: activar flag y animación
         isSliding = true;
+        if (animator != null)
+        {
+            animator.SetBool("barrida", true);
+        }
 
         float slideSpeed = speed * sprintSpeedMultiplier * slideSpeedMultiplier;
         float duration = slideDistance / (slideSpeed > 0f ? slideSpeed : 1f);
@@ -410,7 +424,15 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         isSliding = false;
         if (animator != null)
         {
+            animator.SetTrigger("levantandose");
             animator.SetBool("barrida", false);
+            // Forzar entrada al estado "levantandose" para evitar transiciones directas a Run/Blend
+            // Usa Play para saltar inmediatamente al estado dentro de la capa Base Layer
+            try
+            {
+                animator.Play("levantandose", 0, 0f);
+            }
+            catch { /* si no existe, el trigger sigue funcionando */ }
         }
         // El jugador mantiene su estado de sprint actual, permitiendo hacer otro slide inmediatamente
     }

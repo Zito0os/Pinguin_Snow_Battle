@@ -15927,6 +15927,7 @@ MonoBehaviour:
   slideDistance: 40
   slideSpeedMultiplier: 2.5
   slideStaminaCost: 10
+  slideEntradaDelay: 0.5
   animator: {fileID: 84084396}
   audioPasosCaminar: {fileID: 1713149514}
   audioPasosCorrer: {fileID: 1713149513}

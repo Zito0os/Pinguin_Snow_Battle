@@ -370,12 +370,22 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     private IEnumerator Slide()
     {
+        if (animator != null)
+        {
+            animator.SetBool("barrida", true);
+        }
+
         // Consumir stamina de una sola vez al inicio del slide
         if (staminaSlider != null)
         {
             bool puedeSlide = staminaSlider.UseStaminaInstant(slideStaminaCost);
             if (!puedeSlide)
             {
+                if (animator != null)
+                {
+                    animator.SetBool("barrida", false);
+                }
+
                 yield break; // No hay suficiente stamina, cancelar slide
             }
         }
@@ -398,6 +408,10 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         }
 
         isSliding = false;
+        if (animator != null)
+        {
+            animator.SetBool("barrida", false);
+        }
         // El jugador mantiene su estado de sprint actual, permitiendo hacer otro slide inmediatamente
     }
 

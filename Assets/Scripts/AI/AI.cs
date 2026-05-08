@@ -99,10 +99,11 @@ public class AI : MonoBehaviour
 
         AutoAsignarDestinosSiFaltan();
 
-        //aqui mandamos al agente a el destino que es el destination1
+        // Elegir un destino inicial aleatorio para que cada IA arranque distinto.
         if (TieneDestinosValidos())
         {
-            naveMeshAgent.destination = destinations[0].transform.position;
+            i = ObtenerIndiceDestinoAleatorio(-1);
+            naveMeshAgent.destination = destinations[i].transform.position;
         }
 
         //busca el objeto del jugador en la escena que tenga el script PlayerMovement
@@ -260,18 +261,34 @@ public class AI : MonoBehaviour
         //si la distancia entre el agente y el destino es menor o igual a la distancia que queremos para seguir el camino, entonces cambiamos al siguiente destino
         if (Vector3.Distance(transform.position, destinations[i].position) <= distanceToFollowPath)
         {
-            //si el destino actual no es el ultimo destino, entonces cambiamos al siguiente destino
-            if (destinations[i] != destinations[destinations.Length - 1]) 
-            {
-                i = i + 1;
-            }
-            else
-            {
-                i = 0; //si es el ultimo destino, entonces volvemos al primer destino
-            }
+            i = ObtenerIndiceDestinoAleatorio(i);
+            naveMeshAgent.destination = destinations[i].position;
         }
 
 
+    }
+
+    private int ObtenerIndiceDestinoAleatorio(int indiceActual)
+    {
+        if (!TieneDestinosValidos())
+            return 0;
+
+        List<int> indicesValidos = new List<int>();
+        for (int j = 0; j < destinations.Length; j++)
+        {
+            if (destinations[j] != null && j != indiceActual)
+            {
+                indicesValidos.Add(j);
+            }
+        }
+
+        if (indicesValidos.Count == 0)
+            return Mathf.Max(0, indiceActual);
+
+        if (indicesValidos.Count == 1)
+            return indicesValidos[0];
+
+        return indicesValidos[Random.Range(0, indicesValidos.Count)];
     }
 
 

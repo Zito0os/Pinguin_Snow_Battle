@@ -190,11 +190,19 @@ PrefabInstance:
       objectReference: {fileID: 4106022073019021118}
     - target: {fileID: 8043977012362648579, guid: 591b5f551577f3345944b52fe8e12d40, type: 3}
       propertyPath: liveEnemy
-      value: 40
+      value: 60
       objectReference: {fileID: 0}
     - target: {fileID: 8043977012362648579, guid: 591b5f551577f3345944b52fe8e12d40, type: 3}
       propertyPath: tamanoIconoMinimapa
       value: 2.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8043977012362648579, guid: 591b5f551577f3345944b52fe8e12d40, type: 3}
+      propertyPath: distanceToAttackPlayer
+      value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 8043977012362648579, guid: 591b5f551577f3345944b52fe8e12d40, type: 3}
+      propertyPath: distanceToFollowPlayer
+      value: 50
       objectReference: {fileID: 0}
     - target: {fileID: 9051368864311567601, guid: 591b5f551577f3345944b52fe8e12d40, type: 3}
       propertyPath: m_LocalScale.x

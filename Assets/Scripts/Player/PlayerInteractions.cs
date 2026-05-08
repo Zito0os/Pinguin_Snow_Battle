@@ -37,6 +37,9 @@ public class PlayerInteractions : MonoBehaviour
     //public Transform InteractorSource;
     //public float interactRange;
 
+
+    public int Daño_enemy = 20;
+
     private void Start()
     {
         usarPhotonEnEscena = EsEscenaMultiplayerActiva();
@@ -245,7 +248,7 @@ public class PlayerInteractions : MonoBehaviour
         if (collision.gameObject.CompareTag("EnemyBullet"))
         {
             //perder vida
-            GameManager.Instance.LoseHealth(5);
+            GameManager.Instance.LoseHealth(Daño_enemy);
 
         }
 

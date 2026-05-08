@@ -161,6 +161,7 @@ public class Menu : MonoBehaviour
     private void SetPauseState(bool pause)
     {
         isGamePaused = pause;
+        SetGameAudioMuted(isGamePaused);
 
         if (isGamePaused)
         {
@@ -214,6 +215,7 @@ public class Menu : MonoBehaviour
     {
         opcionesAbiertasDesdePausa = pause;
         isGamePaused = true;
+        SetGameAudioMuted(true);
         Time.timeScale = 0f;
 
         if (pausePanel != null)
@@ -241,6 +243,7 @@ public class Menu : MonoBehaviour
         if (opcionesAbiertasDesdePausa)
         {
             isGamePaused = true;
+            SetGameAudioMuted(true);
             Time.timeScale = 0f;
 
             if (pausePanel != null)
@@ -265,6 +268,11 @@ public class Menu : MonoBehaviour
         {
             SetPauseState(false);
         }
+    }
+
+    private void SetGameAudioMuted(bool muted)
+    {
+        AudioListener.pause = muted;
     }
 
     private bool TryGetEspPauseInput(out bool pausePressed)

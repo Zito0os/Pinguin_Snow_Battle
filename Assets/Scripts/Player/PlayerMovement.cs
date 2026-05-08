@@ -49,6 +49,11 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     private float sprintSpeed = 1;
 
+    [Header("Sprint")]
+    [Tooltip("Tiempo (s) que sigue corriendo después de soltar Shift")] 
+    public float sprintReleaseDelay = 0.5f;
+    private float sprintReleaseTimer = 0f;
+
 
     public float staminaUseAmount = 5f;
 
@@ -262,6 +267,16 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         {
             velocity.y = Mathf.Sqrt(jumpheigth * -2f * gravity);
             animator.SetBool("isJumping", true);
+            // Al saltar, detener el sprint inmediatamente (no esperar el delay)
+            if (isSprinting)
+            {
+                isSprinting = false;
+                sprintReleaseTimer = 0f;
+                if (staminaSlider != null)
+                {
+                    staminaSlider.StopSprinting();
+                }
+            }
         }
 
         if (isGrounded && velocity.y <= 0f)
@@ -272,35 +287,55 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
     public void RunCheck()
     {
-        bool toggleSprintInput = Input.GetKeyDown(KeyCode.LeftShift);
+        // Sprint ahora por mantener presionado Shift (o botón ESP-32)
+        bool runHeld = Input.GetKey(KeyCode.LeftShift);
 
         if (usarInputEsp32 && TryGetEspRunInput(out bool espRun))
         {
-            toggleSprintInput = toggleSprintInput || espRun;
+            runHeld = runHeld || espRun;
         }
 
-        if (toggleSprintInput)
+        // Si se mantiene la tecla, arrancar sprint y resetear timer
+        if (runHeld)
         {
-            isSprinting = !isSprinting;
-
-            if (isSprinting)
+            if (!isSprinting)
             {
-                staminaSlider.UseStamina(staminaUseAmount);
+                isSprinting = true;
+                if (staminaSlider != null)
+                {
+                    staminaSlider.UseStamina(staminaUseAmount);
+                }
             }
-            else
-            {
-                staminaSlider.StopSprinting();
-            }
-        }
 
-        if (isSprinting)
-        {
-            sprintSpeed = sprintSpeedMultiplier;
+            // Mientras el botón esté sostenido, cancelar cualquier timer de release
+            sprintReleaseTimer = 0f;
         }
         else
         {
-            sprintSpeed = 1;
+            // Si no está sostenido pero aún estamos en sprint, iniciar/continuar el timer
+            if (isSprinting)
+            {
+                if (sprintReleaseTimer <= 0f)
+                {
+                    sprintReleaseTimer = sprintReleaseDelay;
+                }
+
+                sprintReleaseTimer -= Time.deltaTime;
+
+                if (sprintReleaseTimer <= 0f)
+                {
+                    // Timer expirado: detener sprint
+                    isSprinting = false;
+                    if (staminaSlider != null)
+                    {
+                        staminaSlider.StopSprinting();
+                    }
+                    sprintReleaseTimer = 0f;
+                }
+            }
         }
+
+        sprintSpeed = isSprinting ? sprintSpeedMultiplier : 1;
     }
 
 

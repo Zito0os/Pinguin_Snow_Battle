@@ -29,7 +29,6 @@ public class GameManager : MonoBehaviour
 
     public int gunammo = 500;
     [SerializeField] private int maxGunAmmo = 210;
-    public int cargador_actual = 20;
     public int cantidad_granadas = 20;
     public int Kills = 0;
     public int Muertes = 0;
@@ -52,7 +51,6 @@ public class GameManager : MonoBehaviour
     {
         Instance = this;
         gunammo = Mathf.Clamp(gunammo, 0, maxGunAmmo);
-        
         usarPhotonEnEscena = EsEscenaMultiplayerActiva();
     }
 
@@ -107,7 +105,9 @@ public class GameManager : MonoBehaviour
         }
         
         gunammo = Mathf.Clamp(gunammo, 0, maxGunAmmo);
-        ammoText.text = cargador_actual.ToString("D2") + "/" + gunammo.ToString("D2");
+        // Mostrar solo el número de balas (gunammo)
+        if (ammoText != null)
+            ammoText.text = gunammo.ToString();
         //healthText.text = health.ToString();
         killsText.text = Kills.ToString();
         granadasText.text = cantidad_granadas.ToString();
@@ -239,7 +239,6 @@ public class GameManager : MonoBehaviour
 
     public void AddGunAmmo(int ammoToAdd)
     {
-
         if (ammoToAdd <= 0)
             return;
 

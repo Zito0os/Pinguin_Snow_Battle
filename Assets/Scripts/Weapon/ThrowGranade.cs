@@ -47,6 +47,7 @@ public class ThrowGranade : MonoBehaviour
     private bool poseOriginalArmaGuardada = false;
     private bool usarPhotonEnEscena = false;
     private PhotonView photonViewRef;
+    private bool parametroLanzarEsTrigger = false;
 
     void Update()
     {
@@ -115,6 +116,19 @@ public class ThrowGranade : MonoBehaviour
         {
             Debug.LogWarning($"[Granada] El Animator no tiene el parámetro '{parametroLanzarGranada}'.");
         }
+        else
+        {
+            // Determinar si el parámetro es Trigger para usar SetTrigger en vez de SetBool
+            AnimatorControllerParameter[] parametros = animator.parameters;
+            for (int i = 0; i < parametros.Length; i++)
+            {
+                if (parametros[i].name == parametroLanzarGranada)
+                {
+                    parametroLanzarEsTrigger = parametros[i].type == AnimatorControllerParameterType.Trigger;
+                    break;
+                }
+            }
+        }
 
         AutoAsignarIKSiHaceFalta();
         AutoAsignarReferenciasArma();
@@ -155,8 +169,16 @@ public class ThrowGranade : MonoBehaviour
         {
             if (AnimatorTieneParametro(parametroLanzarGranada))
             {
-                animator.SetBool(parametroLanzarGranada, true);
-                Debug.Log($"[Granada] Animación activada con parámetro '{parametroLanzarGranada}'.");
+                if (parametroLanzarEsTrigger)
+                {
+                    animator.SetTrigger(parametroLanzarGranada);
+                    Debug.Log($"[Granada] Animación activada con Trigger '{parametroLanzarGranada}'.");
+                }
+                else
+                {
+                    animator.SetBool(parametroLanzarGranada, true);
+                    Debug.Log($"[Granada] Animación activada con Bool '{parametroLanzarGranada}'.");
+                }
             }
         }
 
@@ -177,7 +199,11 @@ public class ThrowGranade : MonoBehaviour
         {
             if (AnimatorTieneParametro(parametroLanzarGranada))
             {
-                animator.SetBool(parametroLanzarGranada, false);
+                // solo resetear el bool si no estamos usando Trigger
+                if (!parametroLanzarEsTrigger)
+                {
+                    animator.SetBool(parametroLanzarGranada, false);
+                }
             }
         }
 

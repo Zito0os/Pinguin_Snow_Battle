@@ -86,14 +86,6 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     public float miraNormal = 60f;
     public bool esta_apuntando = false;
 
-
-
-    //----CARGADOR----
-    int capacidad_cargador = 30;
-    int cantidad_balas_total = 0;
-    int cargador_actual = 0;
-    //----CARGADOR----
-
     private PhotonView ownerPhotonView;
     private Coroutine vibracionContinuaCoroutine;
     private bool vibracionContinuaActiva = false;
@@ -101,6 +93,17 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     private Coroutine disparoConDelayCoroutine;
     private bool disparoPendienteSalida = false;
     private PlayerMovement playerMovement;
+    
+    // --- Charge (hold right click) ---------------------------------
+    [Header("Carga de disparo")]
+    public float tiempoPorFase = 0.5f; // 0.5s por fase
+    private bool isCharging = false;
+    private float tiempoCarga = 0f;
+    private int faseCarga = 1; // 1..7
+    public GameObject[] cargaImages = new GameObject[7]; // UI images Carga1..Carga7
+    private Vector3 balaBaseScale = Vector3.one;
+    [Tooltip("Escalas por fase (índice 0 = fase 1). 7 valores esperados.")]
+    public float[] faseEscala = new float[] { 1f, 1.2f, 1.4f, 1.6f, 1.8f, 2.0f, 2.2f };
 
 
 
@@ -139,6 +142,29 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         }
 
         ResolverAnimatorDisparo();
+
+        // guardar escala base del prefab de la bala
+        if (bullet != null)
+            balaBaseScale = bullet.transform.localScale;
+
+        // autovincular UI de carga si no se asignaron manualmente
+        if (cargaImages == null || cargaImages.Length < 7)
+        {
+            cargaImages = new GameObject[7];
+            GameObject canvasMenu = GameObject.Find("CanvasMenu");
+            if (canvasMenu != null)
+            {
+                for (int i = 0; i < 7; i++)
+                {
+                    Transform t = canvasMenu.transform.Find($"Carga{ i + 1 }");
+                    if (t != null)
+                        cargaImages[i] = t.gameObject;
+                }
+            }
+        }
+
+        // asegurar que UI esté oculta al inicio
+        ActualizarUICarga(0, false);
 
         if (!usarPhotonEnEscena || EsControlLocal())
         {
@@ -182,19 +208,35 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
                 return;
             }
 
-            // Permitir apuntar/desapuntar siempre
-            bool aimToggleInput = Input.GetMouseButtonDown(1);
-            bool espAimDown = TryGetEspButtonDown(14, ref espAimPresionadoFrameAnterior);
-            if (espAimDown && Time.unscaledTime >= proximoToggleApuntarTime)
+            // Carga de disparo con click derecho: mantener para aumentar fase
+            bool rightDown = Input.GetMouseButtonDown(1);
+            bool rightHeld = Input.GetMouseButton(1);
+            bool rightUp = Input.GetMouseButtonUp(1);
+
+            // Si presiona click derecho, o si suelta la carga pero mantiene presionado, reinicia
+            if (rightDown || (!isCharging && rightHeld))
             {
-                aimToggleInput = true;
-                proximoToggleApuntarTime = Time.unscaledTime + toggleCooldownSegundos;
+                isCharging = true;
+                tiempoCarga = 0f;
+                faseCarga = 1;
+                ActualizarUICarga(faseCarga, true);
             }
 
-            if (aimToggleInput)
+            if (rightHeld && isCharging)
             {
-                esta_apuntando = !esta_apuntando;
-                Mira();
+                tiempoCarga += Time.deltaTime;
+                int nuevaFase = Mathf.Min(7, 1 + Mathf.FloorToInt(tiempoCarga / tiempoPorFase));
+                if (nuevaFase != faseCarga)
+                {
+                    faseCarga = nuevaFase;
+                    ActualizarUICarga(faseCarga, true);
+                }
+            }
+
+            if (rightUp && isCharging)
+            {
+                isCharging = false;
+                ActualizarUICarga(0, false);
             }
 
             if (recargando || curando)
@@ -213,10 +255,10 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
             //fire1 - Disparo con MOUSE (PC) - Móvil usará ESP32 háptico
             if (disparoPresionado && Time.timeScale != 0)
             {
-                Debug.Log($"[WeaponLogic] ✓✓✓ Disparo presionado - Cargador: {cargador_actual}, Photon: {usarPhotonEnEscena}, IsMine: {(ownerPhotonView != null ? ownerPhotonView.IsMine.ToString() : "NO_PHOTON")}");
+                Debug.Log($"[WeaponLogic] ✓✓✓ Disparo presionado - Balas: {GameManager.Instance.gunammo}, Photon: {usarPhotonEnEscena}, IsMine: {(ownerPhotonView != null ? ownerPhotonView.IsMine.ToString() : "NO_PHOTON")}");
                 
                 //para la cadencia
-                if (Time.time > shootRateTime && cargador_actual > 0)
+                if (Time.time > shootRateTime && GameManager.Instance.gunammo > 0)
                 {
                     if (continueShooting)
                     {
@@ -241,7 +283,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
                 }
                 else
                 {
-                    Debug.Log($"[WeaponLogic] ✗ No se puede disparar - ShootRateTime: {Time.time > shootRateTime}, Balas: {cargador_actual}");
+                    Debug.Log($"[WeaponLogic] ✗ No se puede disparar - ShootRateTime: {Time.time > shootRateTime}, Balas: {GameManager.Instance.gunammo}");
                 }
             }
 
@@ -255,13 +297,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
                 DetenerVibracionContinua();
             }
 
-            bool reloadInput = Input.GetKeyDown(KeyCode.R) || TryGetEspButtonDown(15, ref espRecargarPresionadoFrameAnterior);
-
-            //recargar el cargador
-            if (reloadInput && cargador_actual < capacidad_cargador && cantidad_balas_total > 0)
-            {
-                recargar_cargador();
-            }
+            // Reload system disabled: reloading by R is removed per design.
 
             bool fireModToggleInput = Input.GetKeyDown(KeyCode.C);
 
@@ -434,7 +470,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
     public void ShootRPC() 
     {
-        Debug.Log($"[WeaponLogic] ✓✓✓ ShootRPC llamado - UsarPhoton: {usarPhotonEnEscena}, OwnerPhotonView: {ownerPhotonView != null}, Balas: {cargador_actual}");
+        Debug.Log($"[WeaponLogic] ✓✓✓ ShootRPC llamado - UsarPhoton: {usarPhotonEnEscena}, OwnerPhotonView: {ownerPhotonView != null}, Balas: {GameManager.Instance.gunammo}");
         
         if (!usarPhotonEnEscena || ownerPhotonView == null)
         {
@@ -443,7 +479,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
             return;
         }
 
-        if (cargador_actual <= 0)
+        if (GameManager.Instance.gunammo <= 0)
         {
             Debug.Log("[WeaponLogic] Sin balas, cancelando ShootRPC");
             CancelInvoke("ShootRPC");
@@ -458,7 +494,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
         disparoPendienteSalida = true;
 
-        cargador_actual--;
+        GameManager.Instance.gunammo--;
         EjecutarVibracionPorDisparo();
         SincronizarHaciaGameManager();
 
@@ -469,15 +505,23 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
 
     [PunRPC]
-    public void ShootMultiplayer(Vector3 position, Vector3 direccionDisparo)
+    public void ShootMultiplayer(Vector3 position, Vector3 direccionDisparo, int fase)
     {
         Debug.Log($"[WeaponLogic] ✓✓✓ RPC ShootMultiplayer recibido - Posición: {position}, Dirección: {direccionDisparo}, IsMine: {(ownerPhotonView != null ? ownerPhotonView.IsMine.ToString() : "NO_PHOTON")}");
         
         GameObject newBullet;
         Quaternion rotacionDisparo = Quaternion.LookRotation(direccionDisparo, Vector3.up);
 
-        //instanciamos una bala 
+        // instanciamos una bala y aplicamos escala según fase
         newBullet = Instantiate(bullet, position, rotacionDisparo);
+        // Si fase == 0 -> no aplicar escala, dejar la escala del prefab tal como está
+        if (fase > 0)
+        {
+            int faseIndex = Mathf.Clamp(fase - 1, 0, 6);
+            float multiplicador = faseEscala[faseIndex];
+            if (newBullet != null)
+                newBullet.transform.localScale = balaBaseScale * multiplicador;
+        }
 
         // Asignar el shooter para detección de daño entre jugadores
         Bullet bulletScript = newBullet.GetComponent<Bullet>();
@@ -505,25 +549,20 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
     {
         if (GameManager.Instance == null)
             return;
-
-        cantidad_balas_total = Mathf.Max(0, GameManager.Instance.gunammo);
-        //clamp hace que este entre 0 y 30 el cargador
-        cargador_actual = Mathf.Clamp(GameManager.Instance.cargador_actual, 0, capacidad_cargador);
+        // Solo sincronizar desde GameManager (gunammo es la fuente única)
     }
 
     private void SincronizarHaciaGameManager()
     {
         if (GameManager.Instance == null)
             return;
-        //.max devuelve el mayor de los dos valores
-        GameManager.Instance.gunammo = Mathf.Max(0, cantidad_balas_total);                                                                                                                                                  
-        GameManager.Instance.cargador_actual = Mathf.Clamp(cargador_actual, 0, capacidad_cargador);
+        // gunammo es sincronizado automáticamente desde el disparo
     }
 
     public void Shoot()
     {
         //checar si tenemos la municion
-        if (cargador_actual > 0)
+        if (GameManager.Instance.gunammo > 0)
         {
             if (disparoPendienteSalida)
             {
@@ -532,7 +571,7 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
             disparoPendienteSalida = true;
 
-            cargador_actual--;
+            GameManager.Instance.gunammo--;
             EjecutarVibracionPorDisparo();
             SincronizarHaciaGameManager();
 
@@ -571,25 +610,46 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
         Vector3 direccionDisparo = ObtenerDireccionDisparo();
 
+        // determinar la fase al momento de disparar
+        // Si el jugador NO está manteniendo el click derecho (no está cargando),
+        // enviaremos fase = 0 para indicar que se debe usar la escala del prefab tal cual.
+        bool aplicarEscala = isCharging;
+        int faseAlDisparar = aplicarEscala ? Mathf.Clamp(faseCarga, 1, 7) : 0;
+
         if (enviarPorRPC && usarPhotonEnEscena && ownerPhotonView != null)
         {
-            Debug.Log($"[WeaponLogic] Enviando RPC ShootMultiplayer - Posición: {spawnPoint.position}, Dirección: {direccionDisparo}, ViewID: {ownerPhotonView.ViewID}");
-            ownerPhotonView.RPC("ShootMultiplayer", RpcTarget.AllViaServer, spawnPoint.position, direccionDisparo);
+            Debug.Log($"[WeaponLogic] Enviando RPC ShootMultiplayer - Posición: {spawnPoint.position}, Dirección: {direccionDisparo}, Fase: {faseAlDisparar}, ViewID: {ownerPhotonView.ViewID}");
+            ownerPhotonView.RPC("ShootMultiplayer", RpcTarget.AllViaServer, spawnPoint.position, direccionDisparo, faseAlDisparar);
         }
 
         if (!enviarPorRPC || !usarPhotonEnEscena || ownerPhotonView == null)
         {
-            InstanciarBalaLocal(spawnPoint.position, direccionDisparo);
+            InstanciarBalaLocal(spawnPoint.position, direccionDisparo, faseAlDisparar);
         }
+
+        // Resetear carga después de disparar
+        isCharging = false;
+        tiempoCarga = 0f;
+        faseCarga = 1;
+        ActualizarUICarga(0, false);
 
         disparoPendienteSalida = false;
         disparoConDelayCoroutine = null;
     }
 
-    private void InstanciarBalaLocal(Vector3 position, Vector3 direccionDisparo)
+    private void InstanciarBalaLocal(Vector3 position, Vector3 direccionDisparo, int fase)
     {
         Quaternion rotacionDisparo = Quaternion.LookRotation(direccionDisparo, Vector3.up);
         GameObject newBullet = Instantiate(bullet, position, rotacionDisparo);
+
+        // Si fase == 0 -> no aplicar escala, dejar la escala del prefab tal como está
+        if (fase > 0)
+        {
+            int faseIndex = Mathf.Clamp(fase - 1, 0, 6);
+            float multiplicador = faseEscala[faseIndex];
+            if (newBullet != null)
+                newBullet.transform.localScale = balaBaseScale * multiplicador;
+        }
 
         Bullet bulletScript = newBullet.GetComponent<Bullet>();
         if (bulletScript != null && ownerPhotonView != null)
@@ -767,61 +827,14 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
     public void recargar_cargador()
     {
-        if (usarPhotonEnEscena && !EsControlLocal())
-            return;
-
-        if (recargando)
-            return;
-
-        if (cargador_actual >= capacidad_cargador)
-            return;
-
-        if (cantidad_balas_total <= 0)
-            return;
-
-        ReproducirSonido(recargaSound);
-
-        recargaCoroutine = StartCoroutine(RecargarConTiempo());
+        // Reload system disabled: function no longer used
+        return;
     }
 
     private IEnumerator RecargarConTiempo()
     {
-        if (usarPhotonEnEscena && !EsControlLocal())
-            yield break;
-
-        recargando = true;
-
-        if (continueShooting)
-        {
-            CancelInvoke("Shoot");
-            CancelInvoke("ShootRPC");
-            DetenerVibracionContinua();
-        }
-
-        if (recargandoUI != null)
-        {
-            recargandoUI.SetActive(true);
-        }
-
-        yield return new WaitForSeconds(tiempoRecarga);
-
-        int espacioEnCargador = capacidad_cargador - cargador_actual;
-        int balasACargar = Mathf.Min(espacioEnCargador, cantidad_balas_total);
-
-        if (balasACargar > 0)
-        {
-            cargador_actual += balasACargar;
-            cantidad_balas_total -= balasACargar;
-            SincronizarHaciaGameManager();
-        }
-
-        if (recargandoUI != null)
-        {
-            recargandoUI.SetActive(false);
-        }
-
-        recargando = false;
-        recargaCoroutine = null;
+        // Reload system disabled: coroutine no longer used
+        yield break;
     }
 
     private void CurarConVenda()
@@ -904,6 +917,27 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
         continueShootingText.gameObject.SetActive(true);
         continueShootingText.text = continueShooting ? textoAutomatico : textoManual;
+    }
+
+    private void ActualizarUICarga(int fase, bool mostrar)
+    {
+        if (cargaImages == null)
+            return;
+
+        for (int i = 0; i < cargaImages.Length; i++)
+        {
+            if (cargaImages[i] == null)
+                continue;
+
+            if (!mostrar)
+            {
+                cargaImages[i].SetActive(false);
+            }
+            else
+            {
+                cargaImages[i].SetActive(i == (fase - 1));
+            }
+        }
     }
 
     private void ReproducirSonido(AudioClip clip)

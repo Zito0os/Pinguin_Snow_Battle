@@ -1,4 +1,6 @@
 ﻿using UnityEngine;
+using UnityEngine.SceneManagement;
+using Photon.Pun;
 
 public class EmotePanel : MonoBehaviour
 {
@@ -22,19 +24,35 @@ public class EmotePanel : MonoBehaviour
     private bool play_emote;
     private float emoteFinTiempo = -1f;
     private PlayerMovement playerMovement;
+    private bool intentoVinculoPendiente = true;
 
     public static EmotePanel instancia;
 
     void Awake()
     {
         instancia = this;
-        playerMovement = FindObjectOfType<PlayerMovement>();
+        playerMovement = FindFirstObjectByType<PlayerMovement>();
+
+        if (!EsEscenaMultiplayerActiva())
+        {
+            intentoVinculoPendiente = false;
+        }
+    }
+
+    void Start()
+    {
+        IntentarVincularAnimatorLocal();
     }
 
 
 
     void Update()
     {
+        if (EsEscenaMultiplayerActiva() && intentoVinculoPendiente && !AnimatorValido(animator))
+        {
+            IntentarVincularAnimatorLocal();
+        }
+
         if (isEmotePlaying && Time.time >= emoteFinTiempo)
         {
             FinalizarEmote();
@@ -134,10 +152,19 @@ public class EmotePanel : MonoBehaviour
     {
         if (emoteActual == -1) return;
 
+        if (!AnimatorValido(animator))
+        {
+            Debug.LogWarning("[EmotePanel] No se encontró un Animator válido del player local. Emote cancelado.");
+            IntentarVincularAnimatorLocal();
+            return;
+        }
+
         animator.SetFloat("EmoteIndex 0", emoteActual);
         animator.SetTrigger("Play_Emote");
         isEmotePlaying = true;
         emoteFinTiempo = Time.time + duracionEmote;
+
+        SincronizarInicioEmoteMultiplayer(emoteActual);
     }
 
     public static void CancelarEmotePorMovimiento()
@@ -168,5 +195,72 @@ public class EmotePanel : MonoBehaviour
             animator.ResetTrigger("Play_Emote");
             animator.CrossFade(isSprintingLocal ? "Run Blend Tree" : "Blend Tree", 0.1f);
         }
+
+        SincronizarFinEmoteMultiplayer(isSprintingLocal);
+    }
+
+    private void SincronizarInicioEmoteMultiplayer(int emoteIndex)
+    {
+        if (playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+        {
+            return;
+        }
+
+        playerMovement.photonView.RPC("RPC_ReproducirEmote", RpcTarget.Others, emoteIndex);
+    }
+
+    private void SincronizarFinEmoteMultiplayer(bool isSprintingLocal)
+    {
+        if (playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+        {
+            return;
+        }
+
+        playerMovement.photonView.RPC("RPC_FinalizarEmote", RpcTarget.Others, isSprintingLocal);
+    }
+
+    private void IntentarVincularAnimatorLocal()
+    {
+        if (!EsEscenaMultiplayerActiva())
+        {
+            return;
+        }
+
+        PlayerMovement[] players = FindObjectsByType<PlayerMovement>(FindObjectsSortMode.None);
+        foreach (PlayerMovement player in players)
+        {
+            if (player == null)
+            {
+                continue;
+            }
+
+            PhotonView view = player.GetComponent<PhotonView>();
+            bool esLocal = view == null || view.IsMine;
+            if (!esLocal)
+            {
+                continue;
+            }
+
+            Animator animatorJugador = player.animator != null ? player.animator : player.GetComponentInChildren<Animator>(true);
+            if (AnimatorValido(animatorJugador))
+            {
+                animator = animatorJugador;
+                playerMovement = player;
+                intentoVinculoPendiente = false;
+                Debug.Log($"[EmotePanel] Animator local vinculado al player '{player.gameObject.name}'");
+                return;
+            }
+        }
+    }
+
+    private bool AnimatorValido(Animator animatorAValidar)
+    {
+        return animatorAValidar != null && animatorAValidar.isActiveAndEnabled && animatorAValidar.runtimeAnimatorController != null;
+    }
+
+    private bool EsEscenaMultiplayerActiva()
+    {
+        string escena = SceneManager.GetActiveScene().name;
+        return escena == "MultiPlayer" || escena == "Multi_Player";
     }
 }

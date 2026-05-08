@@ -409,6 +409,40 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         }
     }
 
+    [PunRPC]
+    public void RPC_ReproducirEmote(int emoteIndex)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null || animator.runtimeAnimatorController == null)
+        {
+            return;
+        }
+
+        animator.SetFloat("EmoteIndex 0", emoteIndex);
+        animator.SetTrigger("Play_Emote");
+    }
+
+    [PunRPC]
+    public void RPC_FinalizarEmote(bool isSprintingLocal)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null || animator.runtimeAnimatorController == null)
+        {
+            return;
+        }
+
+        animator.ResetTrigger("Play_Emote");
+        animator.CrossFade(isSprintingLocal ? "Run Blend Tree" : "Blend Tree", 0.1f);
+    }
+
     private IEnumerator Slide()
     {
         // Consumir stamina de una sola vez al inicio del slide

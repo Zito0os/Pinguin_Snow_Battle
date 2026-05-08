@@ -48,6 +48,8 @@ MonoBehaviour:
   - RPC_IniciarPartida
   - RPC_MostrarPanelVictoria
   - RPC_SincronizarNuevoJugador
+  - RPC_FinalizarEmote
+  - RPC_ReproducirEmote
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

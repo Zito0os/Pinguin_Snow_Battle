@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
+using UnityEngine.UI;
 using Photon.Pun;
 using UnityEngine.SceneManagement;
 
@@ -147,20 +148,27 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         if (bullet != null)
             balaBaseScale = bullet.transform.localScale;
 
-        // autovincular UI de carga si no se asignaron manualmente
-        if (cargaImages == null || cargaImages.Length < 7)
+        // autovincular UI de carga - siempre intentar en MultiPlayer o si array está vacío
+        bool necesitaBuscar = cargaImages == null || cargaImages.Length < 7;
+        if (!necesitaBuscar && cargaImages.Length >= 7)
         {
-            cargaImages = new GameObject[7];
-            GameObject canvasMenu = GameObject.Find("CanvasMenu");
-            if (canvasMenu != null)
+            // Verificar si el array está completamente vacío
+            int imagenesAsignadas = 0;
+            for (int i = 0; i < 7; i++)
             {
-                for (int i = 0; i < 7; i++)
-                {
-                    Transform t = canvasMenu.transform.Find($"Carga{ i + 1 }");
-                    if (t != null)
-                        cargaImages[i] = t.gameObject;
-                }
+                if (cargaImages[i] != null)
+                    imagenesAsignadas++;
             }
+            necesitaBuscar = (imagenesAsignadas == 0);
+        }
+
+        if (necesitaBuscar)
+        {
+            if (cargaImages == null || cargaImages.Length < 7)
+            {
+                cargaImages = new GameObject[7];
+            }
+            VincularImagenesDeCarga();
         }
 
         // asegurar que UI esté oculta al inicio
@@ -463,6 +471,132 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
             Transform encontrado = BuscarHijoRecursivo(hijo, nombreBuscado);
             if (encontrado != null)
                 return encontrado;
+        }
+
+        return null;
+    }
+
+    private bool CoincideNombreFlexible(string nombreObjeto, int numeroFase)
+    {
+        if (string.IsNullOrEmpty(nombreObjeto))
+            return false;
+
+        string sinEspacios = nombreObjeto.Replace(" ", "").ToLower();
+        string buscadoSinEspacios = $"carga{numeroFase}".ToLower();
+        
+        return sinEspacios == buscadoSinEspacios || sinEspacios.Contains(buscadoSinEspacios);
+    }
+
+    private void VincularImagenesDeCarga()
+    {
+        Debug.Log("[WeaponLogic] ✓ Iniciando búsqueda de imágenes de carga...");
+
+        // Estrategia 1: Buscar globalmente por nombre exacto (tolerando espacios)
+        for (int i = 0; i < 7; i++)
+        {
+            if (cargaImages[i] == null)
+            {
+                // Intentar con "Carga1", "Carga 1", etc.
+                string[] nombresAlternativos = new string[]
+                {
+                    $"Carga{i + 1}",
+                    $"Carga {i + 1}",
+                    $"Carga{i}",
+                    $"Carga_{i + 1}",
+                    $"Carga_{i}"
+                };
+
+                foreach (string nombre in nombresAlternativos)
+                {
+                    GameObject cargo = GameObject.Find(nombre);
+                    if (cargo != null)
+                    {
+                        cargaImages[i] = cargo;
+                        Debug.Log($"[WeaponLogic] ✓ Encontrada imagen {i + 1}: '{nombre}'");
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Estrategia 2: Buscar en TODOS los Canvas (incluyendo deshabilitados)
+        Canvas[] todosLosCanvas = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+        Debug.Log($"[WeaponLogic] Encontrados {todosLosCanvas.Length} Canvas en escena");
+
+        foreach (Canvas canvas in todosLosCanvas)
+        {
+            Debug.Log($"[WeaponLogic] Inspeccionando Canvas: {canvas.gameObject.name}");
+            
+            // Buscar recursivamente en todos los hijos (incluyendo deshabilitados)
+            Image[] todasLasImagenes = canvas.GetComponentsInChildren<Image>(true);
+            Debug.Log($"[WeaponLogic]   → {todasLasImagenes.Length} imágenes encontradas (incluyendo deshabilitadas)");
+
+            foreach (Image img in todasLasImagenes)
+            {
+                for (int i = 0; i < 7; i++)
+                {
+                    if (cargaImages[i] == null && CoincideNombreFlexible(img.gameObject.name, i + 1))
+                    {
+                        cargaImages[i] = img.gameObject;
+                        Debug.Log($"[WeaponLogic] ✓ Vinculada Carga{i + 1}: {img.gameObject.name} (Enabled: {img.gameObject.activeSelf})");
+                    }
+                }
+            }
+        }
+
+        // Estrategia 3: Si aún faltan, buscar recursivamente en hierarchía general
+        if (usarPhotonEnEscena)
+        {
+            Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
+            foreach (Canvas canvas in canvases)
+            {
+                for (int i = 0; i < 7; i++)
+                {
+                    if (cargaImages[i] == null)
+                    {
+                        Transform encontrado = BuscarHijoRecursivoFlexible(canvas.transform, i + 1);
+                        if (encontrado != null)
+                        {
+                            cargaImages[i] = encontrado.gameObject;
+                            Debug.Log($"[WeaponLogic] ✓ Vinculada (búsqueda recursiva) Carga{i + 1}: {encontrado.gameObject.name}");
+                        }
+                    }
+                }
+            }
+        }
+
+        // Log final detallado
+        int encontrados = 0;
+        for (int i = 0; i < 7; i++)
+        {
+            if (cargaImages[i] != null)
+            {
+                encontrados++;
+                Debug.Log($"[WeaponLogic]   ✓ Carga{i + 1}: '{cargaImages[i].name}' (Active: {cargaImages[i].activeSelf})");
+            }
+            else
+            {
+                Debug.LogWarning($"[WeaponLogic]   ✗ Carga{i + 1}: NO ENCONTRADA");
+            }
+        }
+        Debug.Log($"[WeaponLogic] RESULTADO FINAL: {encontrados}/7 imágenes de carga vinculadas");
+    }
+
+    private Transform BuscarHijoRecursivoFlexible(Transform raiz, int numeroFase)
+    {
+        if (raiz == null)
+            return null;
+
+        // Verificar el nodo actual
+        if (CoincideNombreFlexible(raiz.gameObject.name, numeroFase))
+            return raiz;
+
+        // Buscar recursivamente en hijos
+        for (int i = 0; i < raiz.childCount; i++)
+        {
+            Transform resultado = BuscarHijoRecursivoFlexible(raiz.GetChild(i), numeroFase);
+            if (resultado != null)
+                return resultado;
         }
 
         return null;
@@ -921,22 +1055,37 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
 
     private void ActualizarUICarga(int fase, bool mostrar)
     {
-        if (cargaImages == null)
+        if (cargaImages == null || cargaImages.Length == 0)
+        {
+            Debug.LogWarning("[WeaponLogic] ActualizarUICarga: cargaImages es null o vacío");
             return;
+        }
 
+        int imagenesValidas = 0;
         for (int i = 0; i < cargaImages.Length; i++)
         {
-            if (cargaImages[i] == null)
-                continue;
-
-            if (!mostrar)
+            if (cargaImages[i] != null)
             {
-                cargaImages[i].SetActive(false);
+                imagenesValidas++;
+                
+                if (!mostrar)
+                {
+                    cargaImages[i].SetActive(false);
+                }
+                else
+                {
+                    cargaImages[i].SetActive(i == (fase - 1));
+                    if (i == (fase - 1))
+                    {
+                        Debug.Log($"[WeaponLogic] Mostrando imagen de carga {fase} en: {cargaImages[i].name}");
+                    }
+                }
             }
-            else
-            {
-                cargaImages[i].SetActive(i == (fase - 1));
-            }
+        }
+        
+        if (imagenesValidas == 0)
+        {
+            Debug.LogError("[WeaponLogic] ActualizarUICarga: Ninguna imagen de carga está vinculada (todos son null)");
         }
     }
 

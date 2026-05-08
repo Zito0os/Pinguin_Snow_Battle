@@ -14941,6 +14941,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 35931044380117934, guid: 5567390aef6fb1d4e86cafaa749059b3, type: 3}
+      propertyPath: granadePrefab
+      value: 
+      objectReference: {fileID: 186105838125190810, guid: b9de7b51d63b8a641a3fd30859bfe146, type: 3}
     - target: {fileID: 728509145266888462, guid: 5567390aef6fb1d4e86cafaa749059b3, type: 3}
       propertyPath: curandoUI
       value: 
@@ -14989,6 +14993,10 @@ PrefabInstance:
       propertyPath: startPosition
       value: 
       objectReference: {fileID: 1663349803}
+    - target: {fileID: 6449421208971764545, guid: 5567390aef6fb1d4e86cafaa749059b3, type: 3}
+      propertyPath: far clip plane
+      value: 5000
+      objectReference: {fileID: 0}
     - target: {fileID: 6786925659557772334, guid: 5567390aef6fb1d4e86cafaa749059b3, type: 3}
       propertyPath: m_LocalPosition.x
       value: -1380

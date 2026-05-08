@@ -1613,7 +1613,7 @@ Camera:
     width: 1
     height: 1
   near clip plane: 0.2
-  far clip plane: 1000
+  far clip plane: 5000
   field of view: 60
   orthographic: 0
   orthographic size: 5
@@ -8838,7 +8838,7 @@ MonoBehaviour:
   nombreEscenaMultiplayer: MultiPlayer
   usarThrowGranadeEsp32: 1
   throwForce: 900
-  granadePrefab: {fileID: 8354786620594686801, guid: 7311046d4100d2444995b4b729b3f6d9, type: 3}
+  granadePrefab: {fileID: 186105838125190810, guid: b9de7b51d63b8a641a3fd30859bfe146, type: 3}
   animator: {fileID: 28405313893327887}
   parametroLanzarGranada: lanzoGranada
   rightHandIK: {fileID: 0}

@@ -25,6 +25,8 @@ public class EmotePanel : MonoBehaviour
     private float emoteFinTiempo = -1f;
     private PlayerMovement playerMovement;
     private bool intentoVinculoPendiente = true;
+    private ThirdPersonCamera thirdPersonCamera;
+    private CameraSwitch cameraSwitch;
 
     public static EmotePanel instancia;
 
@@ -42,6 +44,26 @@ public class EmotePanel : MonoBehaviour
     void Start()
     {
         IntentarVincularAnimatorLocal();
+        
+        // Buscar ThirdPersonCamera y CameraSwitch
+        if (thirdPersonCamera == null)
+        {
+            thirdPersonCamera = FindFirstObjectByType<ThirdPersonCamera>();
+        }
+        
+        if (cameraSwitch == null)
+        {
+            cameraSwitch = FindFirstObjectByType<CameraSwitch>();
+        }
+        
+        if (thirdPersonCamera != null)
+        {
+            Debug.Log("[EmotePanel] ThirdPersonCamera encontrada");
+        }
+        if (cameraSwitch != null)
+        {
+            Debug.Log("[EmotePanel] CameraSwitch encontrada");
+        }
     }
 
 
@@ -164,6 +186,9 @@ public class EmotePanel : MonoBehaviour
         isEmotePlaying = true;
         emoteFinTiempo = Time.time + duracionEmote;
 
+        // Cambiar a cámara de tercera persona
+        CambiarATercerPersona();
+
         SincronizarInicioEmoteMultiplayer(emoteActual);
     }
 
@@ -196,6 +221,9 @@ public class EmotePanel : MonoBehaviour
             animator.CrossFade(isSprintingLocal ? "Run Blend Tree" : "Blend Tree", 0.1f);
         }
 
+        // Cambiar de vuelta a cámara de primera persona
+        CambiarAPrimeraPersona();
+
         SincronizarFinEmoteMultiplayer(isSprintingLocal);
     }
 
@@ -217,6 +245,42 @@ public class EmotePanel : MonoBehaviour
         }
 
         playerMovement.photonView.RPC("RPC_FinalizarEmote", RpcTarget.Others, isSprintingLocal);
+    }
+
+    private void CambiarATercerPersona()
+    {
+        if (cameraSwitch != null)
+        {
+            // Usar reflexión para acceder al campo privado firtPersonEnable
+            System.Reflection.FieldInfo field = cameraSwitch.GetType().GetField("firtPersonEnable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null)
+            {
+                field.SetValue(cameraSwitch, false); // false = tercera persona
+                cameraSwitch.ChangedCamera();
+                Debug.Log("[EmotePanel] ✓ Cambiando a tercera persona");
+            }
+            return;
+        }
+
+        Debug.LogWarning("[EmotePanel] No se encontró CameraSwitch para cambiar a tercera persona");
+    }
+
+    private void CambiarAPrimeraPersona()
+    {
+        if (cameraSwitch != null)
+        {
+            // Usar reflexión para acceder al campo privado firtPersonEnable
+            System.Reflection.FieldInfo field = cameraSwitch.GetType().GetField("firtPersonEnable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (field != null)
+            {
+                field.SetValue(cameraSwitch, true); // true = primera persona
+                cameraSwitch.ChangedCamera();
+                Debug.Log("[EmotePanel] ✓ Cambiando a primera persona");
+            }
+            return;
+        }
+
+        Debug.LogWarning("[EmotePanel] No se encontró CameraSwitch para cambiar a primera persona");
     }
 
     private void IntentarVincularAnimatorLocal()

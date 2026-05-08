@@ -145,6 +145,11 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
 
             bool estaMoviendose = Mathf.Abs(x) > 0.01f || Mathf.Abs(z) > 0.01f;
 
+            if (EmotePanel.isEmotePlaying && estaMoviendose)
+            {
+                EmotePanel.CancelarEmotePorMovimiento();
+            }
+
             animator.SetFloat("VelX", x);
             animator.SetFloat("VelZ", z);
             animator.SetBool("isSprinting", isSprinting);

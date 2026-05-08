@@ -8,9 +8,11 @@ public class EmotePanel : MonoBehaviour
     private int emoteActual = -1;
     private int ultimoEmote = -1;
     private int cantidadEmotes = 5;
+    public float duracionEmote = 10f;
 
     // Variable estática para que otros scripts sepan si el panel está abierto
     public static bool isEmotePanelActive = false;
+    public static bool isEmotePlaying = false;
 
 
     public Animator animator; // Asignar el Animator del jugador en el Inspector
@@ -18,11 +20,26 @@ public class EmotePanel : MonoBehaviour
     public GameObject[] highlights; // 5 objetos
 
     private bool play_emote;
+    private float emoteFinTiempo = -1f;
+    private PlayerMovement playerMovement;
+
+    public static EmotePanel instancia;
+
+    void Awake()
+    {
+        instancia = this;
+        playerMovement = FindObjectOfType<PlayerMovement>();
+    }
 
 
 
     void Update()
     {
+        if (isEmotePlaying && Time.time >= emoteFinTiempo)
+        {
+            FinalizarEmote();
+        }
+
         if (Input.GetKey(KeyCode.H))
         {
             emotePanel.SetActive(true);
@@ -119,5 +136,37 @@ public class EmotePanel : MonoBehaviour
 
         animator.SetFloat("EmoteIndex 0", emoteActual);
         animator.SetTrigger("Play_Emote");
+        isEmotePlaying = true;
+        emoteFinTiempo = Time.time + duracionEmote;
+    }
+
+    public static void CancelarEmotePorMovimiento()
+    {
+        if (instancia != null)
+        {
+            instancia.FinalizarEmote();
+        }
+    }
+
+    private void FinalizarEmote()
+    {
+        FinalizarEmote(playerMovement != null && playerMovement.isSprinting);
+    }
+
+    private void FinalizarEmote(bool isSprintingLocal)
+    {
+        if (!isEmotePlaying)
+        {
+            return;
+        }
+
+        isEmotePlaying = false;
+        emoteFinTiempo = -1f;
+
+        if (animator != null)
+        {
+            animator.ResetTrigger("Play_Emote");
+            animator.CrossFade(isSprintingLocal ? "Run Blend Tree" : "Blend Tree", 0.1f);
+        }
     }
 }

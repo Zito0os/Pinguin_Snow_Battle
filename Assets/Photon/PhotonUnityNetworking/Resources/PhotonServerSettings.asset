@@ -50,6 +50,14 @@ MonoBehaviour:
   - RPC_SincronizarNuevoJugador
   - RPC_FinalizarEmote
   - RPC_ReproducirEmote
+  - RPC_SincronizarAnimacionMovimiento
+  - RPC_FinalizarLanzamientoGranada
+  - RPC_IniciarLanzamientoGranada
+  - RPC_SlideBarrida
+  - RPC_SlideCayendo
+  - RPC_SlideLevantandose
+  - RPC_Disparo
+  - RPC_LanzarGranada
   DisableAutoOpenWizard: 1
   ShowSettings: 1
   DevRegionSetOnce: 1

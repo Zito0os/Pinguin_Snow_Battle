@@ -5,7 +5,7 @@ using Photon.Pun;
 using UnityEngine.SceneManagement;
 
 
-public class PlayerMovement : MonoBehaviourPunCallbacks
+public class PlayerMovement : MonoBehaviourPunCallbacks, IPunObservable
 {
     public static bool bloqueoMovimientoExterno = false;
 
@@ -67,6 +67,12 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
     private bool isSliding = false;
 
     public Animator animator;
+
+    private float ultimoVelXSincronizado = float.NaN;
+    private float ultimoVelZSincronizado = float.NaN;
+    private bool ultimoSprintSincronizado;
+    private bool ultimoJumpSincronizado;
+    private Coroutine resetBoolAnimacionCoroutine;
 
     [Header("Audio pasos")]
     public AudioSource audioPasosCaminar;
@@ -173,6 +179,8 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             RunCheck();
             ActualizarAudioPasos(estaMoviendose);
 
+            SincronizarAnimacionMovimiento(x, z, isSprinting, animator != null && animator.GetBool("isJumping"));
+
 
 
             //esto le asigna el movimiento al caracter controler del player 
@@ -253,6 +261,122 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
     {
         string escena = SceneManager.GetActiveScene().name;
         return escena == nombreEscenaMultiplayer || escena == "MultiPlayer" || escena == "Multi_Player";
+    }
+
+    private void SincronizarAnimacionMovimiento(float velX, float velZ, bool sprintingActual, bool jumpingActual)
+    {
+        if (!usarPhotonEnEscena || photonView == null || !photonView.IsMine)
+        {
+            return;
+        }
+
+        if (float.IsNaN(ultimoVelXSincronizado)
+            || Mathf.Abs(ultimoVelXSincronizado - velX) > 0.001f
+            || Mathf.Abs(ultimoVelZSincronizado - velZ) > 0.001f
+            || ultimoSprintSincronizado != sprintingActual
+            || ultimoJumpSincronizado != jumpingActual)
+        {
+            ultimoVelXSincronizado = velX;
+            ultimoVelZSincronizado = velZ;
+            ultimoSprintSincronizado = sprintingActual;
+            ultimoJumpSincronizado = jumpingActual;
+
+            photonView.RPC(nameof(RPC_SincronizarAnimacionMovimiento), RpcTarget.Others, velX, velZ, sprintingActual, jumpingActual);
+        }
+    }
+
+    private void SincronizarAnimacionSlideInicio()
+    {
+        if (!usarPhotonEnEscena || photonView == null || !photonView.IsMine)
+            return;
+
+        photonView.RPC(nameof(RPC_SlideCayendo), RpcTarget.Others);
+    }
+
+    private void SincronizarAnimacionSlideBarrida(bool activa)
+    {
+        if (!usarPhotonEnEscena || photonView == null || !photonView.IsMine)
+            return;
+
+        photonView.RPC(nameof(RPC_SlideBarrida), RpcTarget.Others, activa);
+    }
+
+    private void SincronizarAnimacionSlideLevantandose()
+    {
+        if (!usarPhotonEnEscena || photonView == null || !photonView.IsMine)
+            return;
+
+        photonView.RPC(nameof(RPC_SlideLevantandose), RpcTarget.Others);
+    }
+
+    [PunRPC]
+    public void RPC_SlideCayendo()
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null)
+            return;
+
+        animator.ResetTrigger("cayendo");
+        animator.ResetTrigger("levantandose");
+        animator.SetTrigger("cayendo");
+    }
+
+    [PunRPC]
+    public void RPC_SlideBarrida(bool activa)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null)
+            return;
+
+        animator.SetBool("barrida", activa);
+    }
+
+    [PunRPC]
+    public void RPC_SlideLevantandose()
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null)
+            return;
+
+        animator.SetTrigger("levantandose");
+        animator.SetBool("barrida", false);
+
+        try
+        {
+            animator.Play("levantandose", 0, 0f);
+        }
+        catch { }
+    }
+
+    [PunRPC]
+    public void RPC_SincronizarAnimacionMovimiento(float velX, float velZ, bool sprintingActual, bool jumpingActual)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null || animator.runtimeAnimatorController == null)
+        {
+            return;
+        }
+
+        animator.SetFloat("VelX", velX);
+        animator.SetFloat("VelZ", velZ);
+        animator.SetBool("isSprinting", sprintingActual);
+        animator.SetBool("isJumping", jumpingActual);
     }
     public void JunpCheck()
     {
@@ -443,6 +567,84 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         animator.CrossFade(isSprintingLocal ? "Run Blend Tree" : "Blend Tree", 0.1f);
     }
 
+    [PunRPC]
+    public void RPC_Disparo()
+    {
+        AplicarAnimacionParametro("disparo", 0.05f);
+    }
+
+    [PunRPC]
+    public void RPC_LanzarGranada(bool activar)
+    {
+        AplicarAnimacionParametro("lanzoGranada", 0.05f, activar);
+    }
+
+    private void AplicarAnimacionParametro(string nombreParametro, float duracionBool, bool activar = true)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (animator == null || string.IsNullOrEmpty(nombreParametro))
+        {
+            return;
+        }
+
+        AnimatorControllerParameter parametroEncontrado = null;
+        foreach (AnimatorControllerParameter parametro in animator.parameters)
+        {
+            if (parametro.name == nombreParametro)
+            {
+                parametroEncontrado = parametro;
+                break;
+            }
+        }
+
+        if (parametroEncontrado == null)
+        {
+            return;
+        }
+
+        if (parametroEncontrado.type == AnimatorControllerParameterType.Trigger)
+        {
+            if (activar)
+            {
+                animator.SetTrigger(nombreParametro);
+            }
+
+            return;
+        }
+
+        if (parametroEncontrado.type == AnimatorControllerParameterType.Bool)
+        {
+            animator.SetBool(nombreParametro, activar);
+
+            if (resetBoolAnimacionCoroutine != null)
+            {
+                StopCoroutine(resetBoolAnimacionCoroutine);
+                resetBoolAnimacionCoroutine = null;
+            }
+
+            if (activar)
+            {
+                resetBoolAnimacionCoroutine = StartCoroutine(ResetBoolAnimacion(nombreParametro, duracionBool));
+            }
+        }
+    }
+
+    private IEnumerator ResetBoolAnimacion(string nombreParametro, float duracionBool)
+    {
+        yield return new WaitForSeconds(Mathf.Max(0.01f, duracionBool));
+
+        if (animator != null)
+        {
+            animator.SetBool(nombreParametro, false);
+        }
+
+        resetBoolAnimacionCoroutine = null;
+    }
+
     private IEnumerator Slide()
     {
         // Consumir stamina de una sola vez al inicio del slide
@@ -465,6 +667,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             animator.ResetTrigger("cayendo");
             animator.ResetTrigger("levantandose");
             animator.SetTrigger("cayendo");
+            SincronizarAnimacionSlideInicio();
         }
 
         // Esperar un instante para que se reproduzca la animación de "cayendo"
@@ -478,6 +681,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         if (animator != null)
         {
             animator.SetBool("barrida", true);
+            SincronizarAnimacionSlideBarrida(true);
         }
 
         float slideSpeed = speed * sprintSpeedMultiplier * slideSpeedMultiplier;
@@ -500,6 +704,7 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
         {
             animator.SetTrigger("levantandose");
             animator.SetBool("barrida", false);
+            SincronizarAnimacionSlideLevantandose();
             // Forzar entrada al estado "levantandose" para evitar transiciones directas a Run/Blend
             // Usa Play para saltar inmediatamente al estado dentro de la capa Base Layer
             try
@@ -509,6 +714,40 @@ public class PlayerMovement : MonoBehaviourPunCallbacks
             catch { /* si no existe, el trigger sigue funcionando */ }
         }
         // El jugador mantiene su estado de sprint actual, permitiendo hacer otro slide inmediatamente
+    }
+
+    public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>(true);
+        }
+
+        if (stream.IsWriting)
+        {
+            float velX = animator != null ? animator.GetFloat("VelX") : 0f;
+            float velZ = animator != null ? animator.GetFloat("VelZ") : 0f;
+            bool jumping = animator != null && animator.GetBool("isJumping");
+
+            stream.SendNext(velX);
+            stream.SendNext(velZ);
+            stream.SendNext(isSprinting);
+            stream.SendNext(jumping);
+            return;
+        }
+
+        float remoteVelX = (float)stream.ReceiveNext();
+        float remoteVelZ = (float)stream.ReceiveNext();
+        bool remoteSprinting = (bool)stream.ReceiveNext();
+        bool remoteJumping = (bool)stream.ReceiveNext();
+
+        if (animator != null)
+        {
+            animator.SetFloat("VelX", remoteVelX);
+            animator.SetFloat("VelZ", remoteVelZ);
+            animator.SetBool("isSprinting", remoteSprinting);
+            animator.SetBool("isJumping", remoteJumping);
+        }
     }
 
 }

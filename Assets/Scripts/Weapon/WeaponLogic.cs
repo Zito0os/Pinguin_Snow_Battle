@@ -826,12 +826,15 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         if (parametroEncontrado.type == AnimatorControllerParameterType.Trigger)
         {
             animatorDisparo.SetTrigger(parametroDisparo);
+            SincronizarAnimacionDisparoMultiplayer();
             return;
         }
 
         if (parametroEncontrado.type == AnimatorControllerParameterType.Bool)
         {
             animatorDisparo.SetBool(parametroDisparo, true);
+
+            SincronizarAnimacionDisparoMultiplayer();
 
             if (resetBoolDisparoCoroutine != null)
             {
@@ -869,6 +872,14 @@ public class WeaponLogic : MonoBehaviourPunCallbacks
         }
 
         resetBoolDisparoCoroutine = null;
+    }
+
+    private void SincronizarAnimacionDisparoMultiplayer()
+    {
+        if (!usarPhotonEnEscena || playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+            return;
+
+        playerMovement.photonView.RPC(nameof(PlayerMovement.RPC_Disparo), RpcTarget.Others);
     }
 
     private void EjecutarVibracionPorDisparo()

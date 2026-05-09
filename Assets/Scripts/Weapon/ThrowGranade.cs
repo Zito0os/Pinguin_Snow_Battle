@@ -47,7 +47,10 @@ public class ThrowGranade : MonoBehaviour
     private bool poseOriginalArmaGuardada = false;
     private bool usarPhotonEnEscena = false;
     private PhotonView photonViewRef;
+    private PlayerMovement playerMovement;
     private bool parametroLanzarEsTrigger = false;
+    private bool parametroLanzarGranadaTieneBool = false;
+    private string[] nombresParametrosLanzamiento = new string[] { "lanzoGranada", "Lanzar_granada", "Lanzar 0" };
 
     void Update()
     {
@@ -108,11 +111,16 @@ public class ThrowGranade : MonoBehaviour
             }
         }
 
+        if (playerMovement == null)
+        {
+            playerMovement = GetComponentInParent<PlayerMovement>();
+        }
+
         if (animator == null)
         {
             Debug.LogWarning("[Granada] No se encontró Animator para reproducir la animación de lanzamiento.");
         }
-        else if (!AnimatorTieneParametro(parametroLanzarGranada))
+        else if (!AnimatorTieneParametro(parametroLanzarGranada) && !ExisteAlgunoDeLosParametrosLanzamiento())
         {
             Debug.LogWarning($"[Granada] El Animator no tiene el parámetro '{parametroLanzarGranada}'.");
         }
@@ -125,6 +133,7 @@ public class ThrowGranade : MonoBehaviour
                 if (parametros[i].name == parametroLanzarGranada)
                 {
                     parametroLanzarEsTrigger = parametros[i].type == AnimatorControllerParameterType.Trigger;
+                    parametroLanzarGranadaTieneBool = parametros[i].type == AnimatorControllerParameterType.Bool;
                     break;
                 }
             }
@@ -167,19 +176,9 @@ public class ThrowGranade : MonoBehaviour
 
         if (animator != null)
         {
-            if (AnimatorTieneParametro(parametroLanzarGranada))
-            {
-                if (parametroLanzarEsTrigger)
-                {
-                    animator.SetTrigger(parametroLanzarGranada);
-                    Debug.Log($"[Granada] Animación activada con Trigger '{parametroLanzarGranada}'.");
-                }
-                else
-                {
-                    animator.SetBool(parametroLanzarGranada, true);
-                    Debug.Log($"[Granada] Animación activada con Bool '{parametroLanzarGranada}'.");
-                }
-            }
+            ActivarAnimacionLanzamientoLocal();
+            SincronizarLanzamientoGranadaMultiplayer(true);
+            SincronizarInicioLanzamientoMultiplayer();
         }
 
         if (tiempoAntesDeLanzar > 0)
@@ -197,14 +196,9 @@ public class ThrowGranade : MonoBehaviour
 
         if (animator != null)
         {
-            if (AnimatorTieneParametro(parametroLanzarGranada))
-            {
-                // solo resetear el bool si no estamos usando Trigger
-                if (!parametroLanzarEsTrigger)
-                {
-                    animator.SetBool(parametroLanzarGranada, false);
-                }
-            }
+            DesactivarAnimacionLanzamientoLocal();
+            SincronizarLanzamientoGranadaMultiplayer(false);
+            SincronizarFinLanzamientoMultiplayer();
         }
 
         if (desactivarIkDuranteGranada)
@@ -279,6 +273,134 @@ public class ThrowGranade : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool ExisteAlgunoDeLosParametrosLanzamiento()
+    {
+        for (int i = 0; i < nombresParametrosLanzamiento.Length; i++)
+        {
+            if (AnimatorTieneParametro(nombresParametrosLanzamiento[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void ActivarAnimacionLanzamientoLocal()
+    {
+        if (animator == null)
+            return;
+
+        bool activo = false;
+        for (int i = 0; i < nombresParametrosLanzamiento.Length; i++)
+        {
+            string nombreParametro = nombresParametrosLanzamiento[i];
+            if (!AnimatorTieneParametro(nombreParametro))
+                continue;
+
+            AnimatorControllerParameter[] parametros = animator.parameters;
+            for (int j = 0; j < parametros.Length; j++)
+            {
+                if (parametros[j].name != nombreParametro)
+                    continue;
+
+                if (parametros[j].type == AnimatorControllerParameterType.Trigger)
+                {
+                    animator.SetTrigger(nombreParametro);
+                    activo = true;
+                }
+                else if (parametros[j].type == AnimatorControllerParameterType.Bool)
+                {
+                    animator.SetBool(nombreParametro, true);
+                    activo = true;
+                }
+
+                break;
+            }
+        }
+
+        Debug.Log($"[Granada] Animación activada localmente. Parámetro encontrado: {activo}");
+    }
+
+    private void DesactivarAnimacionLanzamientoLocal()
+    {
+        if (animator == null)
+            return;
+
+        for (int i = 0; i < nombresParametrosLanzamiento.Length; i++)
+        {
+            string nombreParametro = nombresParametrosLanzamiento[i];
+            if (!AnimatorTieneParametro(nombreParametro))
+                continue;
+
+            AnimatorControllerParameter[] parametros = animator.parameters;
+            for (int j = 0; j < parametros.Length; j++)
+            {
+                if (parametros[j].name != nombreParametro)
+                    continue;
+
+                if (parametros[j].type == AnimatorControllerParameterType.Bool)
+                {
+                    animator.SetBool(nombreParametro, false);
+                }
+
+                break;
+            }
+        }
+    }
+
+    private void SincronizarInicioLanzamientoMultiplayer()
+    {
+        if (!usarPhotonEnEscena || playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+            return;
+
+        playerMovement.photonView.RPC(nameof(PlayerMovement.RPC_LanzarGranada), RpcTarget.Others, true);
+    }
+
+    private void SincronizarFinLanzamientoMultiplayer()
+    {
+        if (!usarPhotonEnEscena || playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+            return;
+
+        playerMovement.photonView.RPC(nameof(PlayerMovement.RPC_LanzarGranada), RpcTarget.Others, false);
+    }
+
+    private void SincronizarLanzamientoGranadaMultiplayer(bool activar)
+    {
+        if (!usarPhotonEnEscena || playerMovement == null || playerMovement.photonView == null || !playerMovement.photonView.IsMine)
+            return;
+
+        playerMovement.photonView.RPC(nameof(PlayerMovement.RPC_LanzarGranada), RpcTarget.Others, activar);
+    }
+
+    [PunRPC]
+    public void RPC_IniciarLanzamientoGranada()
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInParent<Animator>();
+        }
+
+        if (animator == null)
+            return;
+
+        ActivarAnimacionLanzamientoLocal();
+    }
+
+    [PunRPC]
+    public void RPC_FinalizarLanzamientoGranada()
+    {
+        if (animator == null)
+        {
+            animator = GetComponentInParent<Animator>();
+        }
+
+        if (animator == null)
+            return;
+
+        DesactivarAnimacionLanzamientoLocal();
     }
 
     private void AutoAsignarIKSiHaceFalta()
